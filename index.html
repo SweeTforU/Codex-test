@@ -6,12 +6,12 @@
   <title>Movies Fair Rate</title>
   <style>
     body { font-family: Arial, sans-serif; margin: 24px; background:#f7f7fb; color:#222; }
-    .wrap { max-width: 900px; margin: 0 auto; }
+    .wrap { max-width: 1050px; margin: 0 auto; }
     h1 { margin-bottom: 8px; }
     .card { background:#fff; border:1px solid #ddd; border-radius:10px; padding:16px; margin:14px 0; }
     .row { display:flex; gap:10px; flex-wrap:wrap; }
-    input, textarea, select, button { padding:10px; border:1px solid #ccc; border-radius:8px; font-size:14px; }
-    input, textarea { flex:1; min-width:220px; }
+    .col { flex:1; min-width:240px; }
+    input, textarea, select, button { padding:10px; border:1px solid #ccc; border-radius:8px; font-size:14px; width:100%; box-sizing:border-box; }
     textarea { min-height:70px; }
     button { cursor:pointer; background:#2f6fed; color:#fff; border:none; }
     button.secondary { background:#666; }
@@ -19,52 +19,56 @@
     th, td { border-bottom:1px solid #eee; padding:10px; text-align:left; }
     .muted { color:#666; font-size:13px; }
     .score { font-weight:700; }
+    .pill { display:inline-block; padding:3px 8px; border-radius:999px; font-size:12px; color:#fff; }
+    .good { background:#1f9d55; }
+    .mid { background:#b88700; }
+    .bad { background:#c92a2a; }
   </style>
 </head>
 <body>
   <div class="wrap">
-    <h1>电影公平评分实验（HTML 原型）</h1>
-    <p class="muted">目标：允许用户多维度打分，并公开评分构成，减少单一总分带来的偏差。</p>
+    <h1>电影公平评分实验（HTML 原型 v2）</h1>
+    <p class="muted">新增：用户身份、频控防刷、可信度权重、异常评分惩罚，提升评分公正性。</p>
+
+    <div class="card">
+      <h2>评分者身份</h2>
+      <div class="row">
+        <div class="col"><input id="userId" placeholder="评分者ID（如 user_001）" /></div>
+      </div>
+      <p class="muted">同一用户对同一电影需间隔至少 60 秒再次评分。</p>
+    </div>
 
     <div class="card">
       <h2>添加电影</h2>
       <div class="row">
-        <input id="title" placeholder="电影名称（必填）" />
-        <input id="year" placeholder="年份（可选）" />
+        <div class="col"><input id="title" placeholder="电影名称（必填）" /></div>
+        <div class="col"><input id="year" placeholder="年份（可选）" /></div>
       </div>
-      <div class="row" style="margin-top:10px;">
-        <textarea id="desc" placeholder="电影简介（可选）"></textarea>
-      </div>
-      <div class="row" style="margin-top:10px;">
-        <button id="addMovie">添加到列表</button>
-      </div>
+      <div class="row" style="margin-top:10px;"><div class="col"><textarea id="desc" placeholder="电影简介（可选）"></textarea></div></div>
+      <div class="row" style="margin-top:10px;"><div class="col"><button id="addMovie">添加到列表</button></div></div>
     </div>
 
     <div class="card">
       <h2>提交评分</h2>
-      <div class="row">
-        <select id="movieSelect"></select>
-      </div>
+      <div class="row"><div class="col"><select id="movieSelect"></select></div></div>
       <div class="row" style="margin-top:10px;">
-        <input id="story" type="number" min="1" max="10" placeholder="剧情(1-10)" />
-        <input id="visual" type="number" min="1" max="10" placeholder="画面(1-10)" />
-        <input id="acting" type="number" min="1" max="10" placeholder="表演(1-10)" />
+        <div class="col"><input id="story" type="number" min="1" max="10" placeholder="剧情(1-10)" /></div>
+        <div class="col"><input id="visual" type="number" min="1" max="10" placeholder="画面(1-10)" /></div>
+        <div class="col"><input id="acting" type="number" min="1" max="10" placeholder="表演(1-10)" /></div>
       </div>
+      <div class="row" style="margin-top:10px;"><div class="col"><input id="comment" placeholder="简短评论（可选）" /></div></div>
       <div class="row" style="margin-top:10px;">
-        <input id="comment" placeholder="简短评论（可选）" />
+        <div class="col"><button id="rateMovie">提交评分</button></div>
+        <div class="col"><button class="secondary" id="resetData">清空本地数据</button></div>
       </div>
-      <div class="row" style="margin-top:10px;">
-        <button id="rateMovie">提交评分</button>
-        <button class="secondary" id="resetData">清空本地数据</button>
-      </div>
-      <p class="muted">总分 = 剧情40% + 画面30% + 表演30%</p>
+      <p class="muted">基准总分 = 剧情40% + 画面30% + 表演30%；最终采用“可信度加权分”。</p>
     </div>
 
     <div class="card">
       <h2>评分结果</h2>
       <table>
         <thead>
-          <tr><th>电影</th><th>评分人数</th><th>剧情</th><th>画面</th><th>表演</th><th>综合分</th></tr>
+          <tr><th>电影</th><th>有效票数</th><th>剧情</th><th>画面</th><th>表演</th><th>基准分</th><th>公平分</th><th>可信等级</th></tr>
         </thead>
         <tbody id="resultBody"></tbody>
       </table>
@@ -72,22 +76,34 @@
   </div>
 
 <script>
-const KEY = 'movies_fair_rate_v1';
-const state = JSON.parse(localStorage.getItem(KEY) || '{"movies":[],"ratings":{}}');
+const KEY = 'movies_fair_rate_v2';
+const RATE_COOLDOWN_MS = 60 * 1000;
+const state = JSON.parse(localStorage.getItem(KEY) || '{"movies":[],"ratings":{},"users":{}}');
 
 function save(){ localStorage.setItem(KEY, JSON.stringify(state)); }
 function avg(arr){ return arr.length ? arr.reduce((a,b)=>a+b,0)/arr.length : 0; }
-function score(s,v,a){ return s*0.4 + v*0.3 + a*0.3; }
+function baseScore(s,v,a){ return s*0.4 + v*0.3 + a*0.3; }
+
+function credibilityWeight(r){
+  let w = 1;
+  if(!r.comment || r.comment.length < 6) w -= 0.1;
+  const spread = Math.max(r.story, r.visual, r.acting) - Math.min(r.story, r.visual, r.acting);
+  if(spread >= 7) w -= 0.2;
+  if(Math.abs(r.story-r.visual)>=8 || Math.abs(r.story-r.acting)>=8 || Math.abs(r.visual-r.acting)>=8) w -= 0.2;
+  return Math.max(0.4, Math.min(1.2, w));
+}
+
+function trustLevel(score){
+  if(score >= 8) return '<span class="pill good">高</span>';
+  if(score >= 6) return '<span class="pill mid">中</span>';
+  return '<span class="pill bad">低</span>';
+}
 
 function renderSelect(){
   const sel = document.getElementById('movieSelect');
   sel.innerHTML = '';
   if(!state.movies.length){
-    const opt = document.createElement('option');
-    opt.textContent = '请先添加电影';
-    opt.value = '';
-    sel.appendChild(opt);
-    return;
+    const opt = document.createElement('option'); opt.textContent = '请先添加电影'; opt.value = ''; sel.appendChild(opt); return;
   }
   state.movies.forEach(m=>{
     const opt = document.createElement('option');
@@ -98,16 +114,16 @@ function renderSelect(){
 }
 
 function renderTable(){
-  const body = document.getElementById('resultBody');
-  body.innerHTML = '';
+  const body = document.getElementById('resultBody'); body.innerHTML = '';
   state.movies.forEach(m=>{
     const list = state.ratings[m.id] || [];
-    const s = avg(list.map(i=>i.story));
-    const v = avg(list.map(i=>i.visual));
-    const a = avg(list.map(i=>i.acting));
-    const total = score(s,v,a);
+    const s = avg(list.map(i=>i.story)); const v = avg(list.map(i=>i.visual)); const a = avg(list.map(i=>i.acting));
+    const normal = baseScore(s,v,a);
+    const totalWeight = list.reduce((t,i)=>t+credibilityWeight(i),0);
+    const fair = totalWeight ? list.reduce((t,i)=>t+(baseScore(i.story,i.visual,i.acting)*credibilityWeight(i)),0)/totalWeight : 0;
+    const trust = totalWeight ? (totalWeight / Math.max(list.length,1)) * 10 : 0;
     const tr = document.createElement('tr');
-    tr.innerHTML = `<td>${m.title}</td><td>${list.length}</td><td>${s.toFixed(2)}</td><td>${v.toFixed(2)}</td><td>${a.toFixed(2)}</td><td class="score">${total.toFixed(2)}</td>`;
+    tr.innerHTML = `<td>${m.title}</td><td>${list.length}</td><td>${s.toFixed(2)}</td><td>${v.toFixed(2)}</td><td>${a.toFixed(2)}</td><td>${normal.toFixed(2)}</td><td class="score">${fair.toFixed(2)}</td><td>${trustLevel(trust)}</td>`;
     body.appendChild(tr);
   });
 }
@@ -117,34 +133,42 @@ document.getElementById('addMovie').onclick = ()=>{
   const year = document.getElementById('year').value.trim();
   const desc = document.getElementById('desc').value.trim();
   if(!title) return alert('请填写电影名称');
-  state.movies.push({ id: crypto.randomUUID(), title, year, desc });
+  state.movies.push({ id: crypto.randomUUID(), title, year, desc, createdAt: Date.now() });
   save(); renderSelect(); renderTable();
-  document.getElementById('title').value='';
-  document.getElementById('year').value='';
-  document.getElementById('desc').value='';
+  document.getElementById('title').value=''; document.getElementById('year').value=''; document.getElementById('desc').value='';
 };
 
 document.getElementById('rateMovie').onclick = ()=>{
+  const userId = document.getElementById('userId').value.trim();
   const movieId = document.getElementById('movieSelect').value;
   const story = Number(document.getElementById('story').value);
   const visual = Number(document.getElementById('visual').value);
   const acting = Number(document.getElementById('acting').value);
   const comment = document.getElementById('comment').value.trim();
+
+  if(!userId) return alert('请填写评分者ID');
   if(!movieId) return alert('请先添加电影');
   if([story,visual,acting].some(n => n < 1 || n > 10 || Number.isNaN(n))) return alert('请填写 1-10 的评分');
+
+  const key = `${userId}::${movieId}`;
+  const last = state.users[key] || 0;
+  const now = Date.now();
+  if(now - last < RATE_COOLDOWN_MS) {
+    const sec = Math.ceil((RATE_COOLDOWN_MS - (now-last))/1000);
+    return alert(`评分过于频繁，请 ${sec} 秒后再试`);
+  }
+
   if(!state.ratings[movieId]) state.ratings[movieId] = [];
-  state.ratings[movieId].push({ story, visual, acting, comment, at: Date.now() });
+  state.ratings[movieId].push({ userId, story, visual, acting, comment, at: now });
+  state.users[key] = now;
+
   save(); renderTable();
-  document.getElementById('story').value='';
-  document.getElementById('visual').value='';
-  document.getElementById('acting').value='';
-  document.getElementById('comment').value='';
+  document.getElementById('story').value=''; document.getElementById('visual').value=''; document.getElementById('acting').value=''; document.getElementById('comment').value='';
 };
 
 document.getElementById('resetData').onclick = ()=>{
   if(!confirm('确认清空本地所有电影和评分数据？')) return;
-  localStorage.removeItem(KEY);
-  location.reload();
+  localStorage.removeItem(KEY); location.reload();
 };
 
 renderSelect(); renderTable();
