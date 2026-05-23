@@ -1,0 +1,153 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Movies Fair Rate</title>
+  <style>
+    body { font-family: Arial, sans-serif; margin: 24px; background:#f7f7fb; color:#222; }
+    .wrap { max-width: 900px; margin: 0 auto; }
+    h1 { margin-bottom: 8px; }
+    .card { background:#fff; border:1px solid #ddd; border-radius:10px; padding:16px; margin:14px 0; }
+    .row { display:flex; gap:10px; flex-wrap:wrap; }
+    input, textarea, select, button { padding:10px; border:1px solid #ccc; border-radius:8px; font-size:14px; }
+    input, textarea { flex:1; min-width:220px; }
+    textarea { min-height:70px; }
+    button { cursor:pointer; background:#2f6fed; color:#fff; border:none; }
+    button.secondary { background:#666; }
+    table { width:100%; border-collapse:collapse; margin-top:10px; }
+    th, td { border-bottom:1px solid #eee; padding:10px; text-align:left; }
+    .muted { color:#666; font-size:13px; }
+    .score { font-weight:700; }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <h1>电影公平评分实验（HTML 原型）</h1>
+    <p class="muted">目标：允许用户多维度打分，并公开评分构成，减少单一总分带来的偏差。</p>
+
+    <div class="card">
+      <h2>添加电影</h2>
+      <div class="row">
+        <input id="title" placeholder="电影名称（必填）" />
+        <input id="year" placeholder="年份（可选）" />
+      </div>
+      <div class="row" style="margin-top:10px;">
+        <textarea id="desc" placeholder="电影简介（可选）"></textarea>
+      </div>
+      <div class="row" style="margin-top:10px;">
+        <button id="addMovie">添加到列表</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>提交评分</h2>
+      <div class="row">
+        <select id="movieSelect"></select>
+      </div>
+      <div class="row" style="margin-top:10px;">
+        <input id="story" type="number" min="1" max="10" placeholder="剧情(1-10)" />
+        <input id="visual" type="number" min="1" max="10" placeholder="画面(1-10)" />
+        <input id="acting" type="number" min="1" max="10" placeholder="表演(1-10)" />
+      </div>
+      <div class="row" style="margin-top:10px;">
+        <input id="comment" placeholder="简短评论（可选）" />
+      </div>
+      <div class="row" style="margin-top:10px;">
+        <button id="rateMovie">提交评分</button>
+        <button class="secondary" id="resetData">清空本地数据</button>
+      </div>
+      <p class="muted">总分 = 剧情40% + 画面30% + 表演30%</p>
+    </div>
+
+    <div class="card">
+      <h2>评分结果</h2>
+      <table>
+        <thead>
+          <tr><th>电影</th><th>评分人数</th><th>剧情</th><th>画面</th><th>表演</th><th>综合分</th></tr>
+        </thead>
+        <tbody id="resultBody"></tbody>
+      </table>
+    </div>
+  </div>
+
+<script>
+const KEY = 'movies_fair_rate_v1';
+const state = JSON.parse(localStorage.getItem(KEY) || '{"movies":[],"ratings":{}}');
+
+function save(){ localStorage.setItem(KEY, JSON.stringify(state)); }
+function avg(arr){ return arr.length ? arr.reduce((a,b)=>a+b,0)/arr.length : 0; }
+function score(s,v,a){ return s*0.4 + v*0.3 + a*0.3; }
+
+function renderSelect(){
+  const sel = document.getElementById('movieSelect');
+  sel.innerHTML = '';
+  if(!state.movies.length){
+    const opt = document.createElement('option');
+    opt.textContent = '请先添加电影';
+    opt.value = '';
+    sel.appendChild(opt);
+    return;
+  }
+  state.movies.forEach(m=>{
+    const opt = document.createElement('option');
+    opt.value = m.id;
+    opt.textContent = m.title + (m.year ? ` (${m.year})` : '');
+    sel.appendChild(opt);
+  });
+}
+
+function renderTable(){
+  const body = document.getElementById('resultBody');
+  body.innerHTML = '';
+  state.movies.forEach(m=>{
+    const list = state.ratings[m.id] || [];
+    const s = avg(list.map(i=>i.story));
+    const v = avg(list.map(i=>i.visual));
+    const a = avg(list.map(i=>i.acting));
+    const total = score(s,v,a);
+    const tr = document.createElement('tr');
+    tr.innerHTML = `<td>${m.title}</td><td>${list.length}</td><td>${s.toFixed(2)}</td><td>${v.toFixed(2)}</td><td>${a.toFixed(2)}</td><td class="score">${total.toFixed(2)}</td>`;
+    body.appendChild(tr);
+  });
+}
+
+document.getElementById('addMovie').onclick = ()=>{
+  const title = document.getElementById('title').value.trim();
+  const year = document.getElementById('year').value.trim();
+  const desc = document.getElementById('desc').value.trim();
+  if(!title) return alert('请填写电影名称');
+  state.movies.push({ id: crypto.randomUUID(), title, year, desc });
+  save(); renderSelect(); renderTable();
+  document.getElementById('title').value='';
+  document.getElementById('year').value='';
+  document.getElementById('desc').value='';
+};
+
+document.getElementById('rateMovie').onclick = ()=>{
+  const movieId = document.getElementById('movieSelect').value;
+  const story = Number(document.getElementById('story').value);
+  const visual = Number(document.getElementById('visual').value);
+  const acting = Number(document.getElementById('acting').value);
+  const comment = document.getElementById('comment').value.trim();
+  if(!movieId) return alert('请先添加电影');
+  if([story,visual,acting].some(n => n < 1 || n > 10 || Number.isNaN(n))) return alert('请填写 1-10 的评分');
+  if(!state.ratings[movieId]) state.ratings[movieId] = [];
+  state.ratings[movieId].push({ story, visual, acting, comment, at: Date.now() });
+  save(); renderTable();
+  document.getElementById('story').value='';
+  document.getElementById('visual').value='';
+  document.getElementById('acting').value='';
+  document.getElementById('comment').value='';
+};
+
+document.getElementById('resetData').onclick = ()=>{
+  if(!confirm('确认清空本地所有电影和评分数据？')) return;
+  localStorage.removeItem(KEY);
+  location.reload();
+};
+
+renderSelect(); renderTable();
+</script>
+</body>
+</html>
