@@ -1,10 +1,63 @@
 # Codex Test Repository
 
-This repository is a **test project for Codex**.
+A structured experimental workspace for testing AI-assisted software engineering workflows.
 
-- The `main` branch is the primary trunk.
-- All actions and code changes in this project are performed by **Codex**.
-- The only additional branch currently in scope is `topic/snake-game`.
-- `topic/snake-game` was created by Codex in a separate session and does not require management in this session.
+## Repository Purpose
 
-In short, this repository exists to test Codex coding workflows and behavior.
+This repository started as a lightweight Codex testing environment and is now being reorganized into a scalable multi-project workspace.
+
+The goal is to explore:
+
+- AI-assisted coding
+- Agent workflows
+- Multi-branch development
+- Experimental applications
+- Project architecture design
+
+## Repository Structure
+
+```text
+/apps
+  Experimental applications
+
+/packages
+  Shared reusable modules
+
+/docs
+  Architecture and engineering documentation
+```
+
+## Branching Strategy
+
+```text
+main
+  Stable primary branch
+
+topic/*
+  Experimental branches and prototypes
+
+feature/*
+  Long-term product features
+
+fix/*
+  Bug fixes and patches
+```
+
+## Current Experimental Branches
+
+- `topic/snake-game`
+- `topic/movies-test`
+- `topic/project-structure-refactor`
+
+## Long-Term Direction
+
+This repository may evolve into:
+
+- AI tooling workspace
+- Frontend experiment collection
+- GitHub automation sandbox
+- Agent engineering testbed
+
+## Notes
+
+This project is intentionally iterative and architecture-focused.
